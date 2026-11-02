@@ -7,6 +7,10 @@ namespace WeatherWall
     // Stored as JSON in %APPDATA%\WeatherWall\settings.json.
     public class Settings
     {
+        // False (the default): City follows the Windows time zone. True: the user picked City.
+        public bool CityIsManual { get; set; }
+        // The Windows time zone the automatic City was found for; a change triggers a new lookup.
+        public string AutoZone { get; set; }
         public string City { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
@@ -45,7 +49,7 @@ namespace WeatherWall
         {
             if (string.IsNullOrEmpty(City))
             {
-                // Köthen (Anhalt), the first campus of Hochschule Anhalt.
+                // Only until the time-zone city is found (or for zones that name no city).
                 City = "Köthen (Anhalt), Germany";
                 Latitude = 51.75185;
                 Longitude = 11.97093;

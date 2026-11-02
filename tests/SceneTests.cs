@@ -112,6 +112,7 @@ namespace WeatherWall.Tests
             Eq(null, on(2027, 6, 15), "ordinary day");
 
             failures += UpdaterTests.Run();
+            failures += LocationTests.Run();
 
             Console.WriteLine(failures == 0 ? "All tests passed." : failures + " test(s) failed.");
             return failures == 0 ? 0 : 1;

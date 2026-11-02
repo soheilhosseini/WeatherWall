@@ -29,6 +29,7 @@ namespace WeatherWall
         public string Label;
         public double Latitude;
         public double Longitude;
+        public string Timezone;   // IANA, e.g. "Asia/Tehran"
 
         public override string ToString() { return Label; }
     }
@@ -96,7 +97,7 @@ namespace WeatherWall
             foreach (Dictionary<string, object> r in (IList)results)
             {
                 var parts = new List<string> { (string)r["name"] };
-                object admin, country;
+                object admin, country, zone;
                 if (r.TryGetValue("admin1", out admin)) parts.Add((string)admin);
                 if (r.TryGetValue("country", out country)) parts.Add((string)country);
                 list.Add(new City
@@ -104,6 +105,7 @@ namespace WeatherWall
                     Label = string.Join(", ", parts),
                     Latitude = Num(r["latitude"]),
                     Longitude = Num(r["longitude"]),
+                    Timezone = r.TryGetValue("timezone", out zone) ? (string)zone : null,
                 });
             }
             return list;

@@ -1,25 +1,47 @@
+<div align="center">
+
 # WeatherWall
 
-A tiny Windows tray app that changes your desktop wallpaper to match the **live weather**, the
-**time of day** in your city, and **special days** of the year.
+**Your Windows wallpaper follows the real weather, the hour of the day, and the holidays.**
 
-- Lives next to the clock, starts with Windows, ~45 KB, no installer, no runtime to download
-  (it uses the .NET Framework 4.x that ships with Windows 10 and 11).
-- Weather from [Open-Meteo](https://open-meteo.com) — free for non-commercial use, no API key.
-- Checks the weather once an hour and the time of day every five minutes; the wallpaper only
-  changes when the picture should.
+<img src="https://raw.githubusercontent.com/soheilhosseini/WeatherWall-Pack/main/showcase/day-cycle.gif" alt="The wallpaper through one day" width="760">
+
+[**⬇ Download WeatherWall.exe**](https://github.com/soheilhosseini/WeatherWall/releases/latest/download/WeatherWall.exe)
+&nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; ~60 KB &nbsp;·&nbsp; free and open source
+
+</div>
+
+Rain outside? The two cats share an umbrella. Snowing? Knitted hats and a campfire. Late at
+night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole beach dresses up.
+
+<img src="https://raw.githubusercontent.com/soheilhosseini/WeatherWall-Pack/main/showcase/scenes.jpg" alt="Weather and holiday scenes" width="100%">
+
+- **Live weather** for your city — clear, cloudy, rain, storm, snow, fog, wind, heat and cold.
+- **Real sunrise and sunset**: dawn, morning, noon, afternoon, sunset, night and late night.
+- **Special days**: Nowruz, Sizdah Bedar, Chaharshanbe Suri, Yalda, New Year, Christmas,
+  Halloween, Valentine's Day, Easter and Lunar New Year — calculated, never a fixed table.
+- **Zero setup**: the city follows your Windows time zone; pick an exact city if you like.
+- **Tiny and quiet**: lives next to the clock, starts with Windows, no admin rights, no runtime
+  to install, no account, no tracking.
+- **Updates itself**, safely: every update is cryptographically signed.
 
 ## Use
 
-1. Download `WeatherWall.exe` from the [latest release](https://github.com/soheilhosseini/WeatherWall/releases/latest)
-   and run it. It installs itself into `%LOCALAPPDATA%\Programs\WeatherWall` (no admin rights),
-   starts with Windows, and downloads the image pack on its own. Run with `--portable` to skip
-   the install.
+1. [Download `WeatherWall.exe`](https://github.com/soheilhosseini/WeatherWall/releases/latest/download/WeatherWall.exe)
+   and run it. It installs itself into `%LOCALAPPDATA%\Programs\WeatherWall`, starts with
+   Windows, and downloads the images (about 110 MB, once) — a notification and the tray
+   tooltip show the progress. Run with `--portable` to skip the install.
+   Windows SmartScreen may warn about a new, unsigned app: **More info → Run anyway**.
 2. Right-click the tray icon:
-   - **City…** — search any city (Open-Meteo geocoding).
-   - **Scene** — Auto, or pin a scene / occasion to preview it.
+   - **Location…** — automatic (your Windows time zone) or an exact city you search for.
+   - **Scene** — Auto, or pin a scene / special day to preview it.
    - **Refresh now**, **Choose image folder…**, **Open image folder**
-   - **Start with Windows** — on by default after the first run.
+   - **Start with Windows** — on by default.
+   - **Check for updates**
+
+Weather comes from [Open-Meteo](https://open-meteo.com) (free for non-commercial use, no API
+key). WeatherWall checks the weather hourly, the time of day every five minutes, and changes the
+wallpaper only when the picture should.
 
 Settings and a log live in `%APPDATA%\WeatherWall\`.
 
@@ -78,7 +100,8 @@ they are right every year without a table. If two fall on one day, the Persian o
 
 ## Updates
 
-WeatherWall checks GitHub once a day (and from **Check for updates** in the tray menu):
+WeatherWall checks GitHub when it starts, after the PC wakes from sleep, once a day, and from
+**Check for updates** in the tray menu:
 
 - the latest release of this repository for a newer `WeatherWall.exe`;
 - the latest release of [`WeatherWall-Pack`](https://github.com/soheilhosseini/WeatherWall-Pack)

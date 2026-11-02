@@ -99,34 +99,42 @@ namespace WeatherWall
             using (var wc = Client()) return wc.DownloadString(url);
         }
 
-        static byte[] DownloadBytes(string url)
+        // progress (0-100) is called from a pool thread while the file downloads.
+        static byte[] DownloadBytes(string url, Action<int> progress = null)
         {
-            using (var wc = Client()) return wc.DownloadData(url);
+            using (var wc = Client())
+            {
+                if (progress != null) wc.DownloadProgressChanged += (s, e) => progress(e.ProgressPercentage);
+                try { return wc.DownloadDataTaskAsync(new Uri(url)).Result; }
+                catch (AggregateException ex) { throw ex.InnerException; }
+            }
         }
 
         // Downloads name and name.sig from the release; returns the bytes only if the signature holds.
-        static byte[] DownloadVerified(Release release, string name, out string signature)
+        static byte[] DownloadVerified(Release release, string name, out string signature, Action<int> progress = null)
         {
             signature = null;
             string url, sigUrl;
             if (!release.AssetUrls.TryGetValue(name, out url) || !release.AssetUrls.TryGetValue(name + ".sig", out sigUrl))
                 return null;
             signature = DownloadString(sigUrl).Trim();
-            var data = DownloadBytes(url);
+            var data = DownloadBytes(url, progress);
             if (!VerifySignature(data, signature, PublicKeyXml))
                 throw new InvalidDataException(name + " from " + release.Tag + " failed its signature check; not installed.");
             return data;
         }
 
         // Returns the new pack signature when the pack was replaced, else null.
-        public static string UpdatePackIfChanged(Release release, string packFolder, string installedSignature)
+        public static string UpdatePackIfChanged(Release release, string packFolder, string installedSignature,
+            Action<int> progress = null)
         {
             string sigUrl;
             if (!release.AssetUrls.TryGetValue("pack.zip.sig", out sigUrl)) return null;
             if (DownloadString(sigUrl).Trim() == installedSignature) return null;
 
             string signature;
-            var zip = DownloadVerified(release, "pack.zip", out signature);
+            if (progress != null) progress(0);
+            var zip = DownloadVerified(release, "pack.zip", out signature, progress);
             if (zip == null) return null;
 
             var staging = packFolder.TrimEnd('\\') + ".new";

@@ -27,6 +27,7 @@ namespace WeatherWall
         readonly System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer { Interval = 30 * 1000 };
         readonly ToolStripMenuItem updateItem = new ToolStripMenuItem();
         bool updateRunning;
+        int packProgress = -1;   // 0-100 while the image pack downloads, else -1
 
         SynchronizationContext ui;
         Weather weather;
@@ -52,6 +53,7 @@ namespace WeatherWall
             timer.Tick += delegate { Tick(false); };
             timer.Start();
             SystemEvents.PowerModeChanged += OnPowerModeChanged;
+            SystemEvents.TimeChanged += OnTimeChanged;
             updateTimer.Tick += delegate { updateTimer.Interval = 24 * 60 * 60 * 1000; CheckForUpdates(false); };
             // A fresh install has no images yet: fetch the pack right away instead of in 30 s.
             if (PackIsManagedByUpdates && PackIsEmpty) updateTimer.Interval = 2000;
@@ -82,20 +84,47 @@ namespace WeatherWall
         }
 
         // A missing or failing pack repository must never block app updates.
-        static string TryUpdatePack(string packFolder, string packSignature)
+        string TryUpdatePack(string packFolder, string packSignature)
         {
+            int shown = -1;
+            Action<int> progress = percent =>
+            {
+                if (percent == shown) return;
+                var first = shown < 0;
+                shown = percent;
+                ui.Post(delegate { ShowPackProgress(percent, first); }, null);
+            };
             try
             {
                 var packRelease = Updater.LatestRelease(Updater.PackRepo);
-                var signature = Updater.UpdatePackIfChanged(packRelease, packFolder, packSignature);
+                var signature = Updater.UpdatePackIfChanged(packRelease, packFolder, packSignature, progress);
                 Log.Write("pack check: latest " + packRelease.Tag + ", " + (signature != null ? "updated" : "current"));
+                if (signature != null)
+                    ui.Post(delegate { tray.ShowBalloonTip(4000, "WeatherWall", "Images ready — enjoy your new wallpaper.", ToolTipIcon.Info); }, null);
                 return signature;
             }
             catch (Exception ex)
             {
                 Log.Write("pack check failed: " + ex);
+                if (shown >= 0)
+                    ui.Post(delegate { tray.ShowBalloonTip(5000, "WeatherWall", "Image download failed; it will retry later.", ToolTipIcon.Warning); }, null);
                 return null;
             }
+            finally
+            {
+                ui.Post(delegate { packProgress = -1; UpdateMenu(); }, null);
+            }
+        }
+
+        // The pack is ~100 MB: say so, and show the percentage in the tray tooltip and menu.
+        void ShowPackProgress(int percent, bool first)
+        {
+            packProgress = percent;
+            if (first)
+                tray.ShowBalloonTip(6000, "Downloading wallpaper images",
+                    "This happens once and takes a minute or two. Your wallpaper changes when it is done.",
+                    ToolTipIcon.Info);
+            UpdateMenu();
         }
 
         // Network work runs on a pool thread; anything that touches the UI is posted back.
@@ -218,7 +247,7 @@ namespace WeatherWall
 
         void UpdateMenu()
         {
-            cityItem.Text = "City: " + settings.City + "…";
+            cityItem.Text = "Location: " + settings.City + (settings.CityIsManual ? " (chosen)" : " (automatic)") + "…";
             autostartItem.Checked = Autostart.IsOn;
             foreach (ToolStripMenuItem item in sceneMenu.DropDownItems)
                 item.Checked = (string)item.Tag == settings.SceneOverride;
@@ -229,6 +258,7 @@ namespace WeatherWall
 
         string StatusText()
         {
+            if (packProgress >= 0) return "Downloading images… " + packProgress + "%";
             if (lastError != null) return "⚠ " + lastError;
             if (weather == null) return "Fetching weather…";
             var occasion = CurrentOccasion();
@@ -253,6 +283,7 @@ namespace WeatherWall
 
         void Tick(bool forceFetch)
         {
+            if (FollowWindowsTimeZone()) forceFetch = true;
             if (forceFetch || weather == null || DateTime.UtcNow - weather.FetchedUtc >= TimeSpan.FromMinutes(60))
             {
                 try
@@ -294,6 +325,7 @@ namespace WeatherWall
                     {
                         Wallpaper.Set(path);
                         currentPath = path;
+                        lastError = null;
                         Log.Write("wallpaper: " + scene + "/" + slot + " -> " + path);
                     }
                     catch (Exception ex)
@@ -308,12 +340,17 @@ namespace WeatherWall
 
         void ChooseCity()
         {
-            using (var form = new CityForm(settings.City))
+            using (var form = new CityForm(settings.CityIsManual, settings.City))
             {
                 if (form.ShowDialog() != DialogResult.OK) return;
-                settings.City = form.Selected.Label;
-                settings.Latitude = form.Selected.Latitude;
-                settings.Longitude = form.Selected.Longitude;
+                settings.CityIsManual = !form.Automatic;
+                if (form.Automatic) settings.AutoZone = null;   // look it up again now
+                else
+                {
+                    settings.City = form.Selected.Label;
+                    settings.Latitude = form.Selected.Latitude;
+                    settings.Longitude = form.Selected.Longitude;
+                }
                 settings.Save();
             }
             Tick(true);
@@ -333,13 +370,67 @@ namespace WeatherWall
 
         void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
         {
-            // Raised on a system thread; run the refresh on the UI thread.
-            if (e.Mode == PowerModes.Resume) ui.Post(delegate { Tick(true); }, null);
+            // Raised on a system thread. Give the network a moment to come back after sleep, then
+            // refresh the weather and look for updates once.
+            if (e.Mode != PowerModes.Resume) return;
+            ui.Post(delegate
+            {
+                var afterWake = new System.Windows.Forms.Timer { Interval = 15000 };
+                afterWake.Tick += delegate
+                {
+                    afterWake.Stop();
+                    afterWake.Dispose();
+                    Log.Write("woke from sleep");
+                    Tick(true);
+                    CheckForUpdates(false);
+                };
+                afterWake.Start();
+            }, null);
+        }
+
+        void OnTimeChanged(object sender, EventArgs e)
+        {
+            // The clock or the time zone changed (travel, or a manual change in Windows settings).
+            ui.Post(delegate { Tick(true); }, null);
+        }
+
+        // In automatic mode, (re)find the city whenever the Windows time zone differs from the one
+        // the current city was found for. Returns true when the city changed.
+        bool FollowWindowsTimeZone()
+        {
+            if (settings.CityIsManual) return false;
+            var zone = AutoCity.CurrentWindowsZone();
+            if (zone == settings.AutoZone) return false;
+            try
+            {
+                var city = AutoCity.Resolve(zone);
+                if (city == null)
+                {
+                    Log.Write("no city for time zone " + zone + "; keeping " + settings.City);
+                    settings.AutoZone = zone;
+                    settings.Save();
+                    return false;
+                }
+                settings.City = city.Label;
+                settings.Latitude = city.Latitude;
+                settings.Longitude = city.Longitude;
+                settings.AutoZone = zone;
+                settings.Save();
+                Log.Write("time zone " + zone + " -> " + city.Label);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Offline: keep the last city and try again on the next tick.
+                Log.Write("time zone city lookup failed: " + ex.Message);
+                return false;
+            }
         }
 
         protected override void ExitThreadCore()
         {
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            SystemEvents.TimeChanged -= OnTimeChanged;
             timer.Stop();
             updateTimer.Stop();
             tray.Visible = false;
