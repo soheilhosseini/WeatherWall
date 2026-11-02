@@ -391,27 +391,46 @@ namespace WeatherWall
             if (forceFetch || weather == null || DateTime.UtcNow - weather.FetchedUtc >= TimeSpan.FromMinutes(60))
             {
                 if (askWindowsLocation) FollowWindowsLocation();
-                try
+                // Open-Meteo first, MET Norway when it fails, and this PC when both do.
+                var last = weather ?? (settings.LastWeather != null ? Weather.Load(settings.LastWeather) : null);
+                var offset = last != null ? last.UtcOffsetSeconds : (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow).TotalSeconds;
+                Exception failure = null;
+                foreach (var source in new[] { "Open-Meteo", "MET Norway" })
                 {
-                    weather = WeatherClient.Fetch(settings.Latitude, settings.Longitude);
-                    lastError = null;
-                    settings.LastWeather = weather.Save();
-                    settings.Save();
-                    Log.Write(string.Format(CultureInfo.InvariantCulture,
-                        "weather for {0}: code {1}, low/mid cloud {6}%, {2}°C, wind {3} km/h, sunrise {4:HH:mm}, sunset {5:HH:mm}",
-                        settings.City, weather.Code, weather.TemperatureC, weather.WindKmh, weather.Sunrise, weather.Sunset,
-                        weather.LowMidCloudPercent));
+                    try
+                    {
+                        weather = source == "Open-Meteo"
+                            ? WeatherClient.Fetch(settings.Latitude, settings.Longitude)
+                            : WeatherClient.FetchMetNo(settings.Latitude, settings.Longitude, offset);
+                        lastError = null;
+                        failure = null;
+                        settings.LastWeather = weather.Save();
+                        settings.Save();
+                        Log.Write(string.Format(CultureInfo.InvariantCulture,
+                            "weather for {0} from {7}: code {1}, low/mid cloud {6}%, {2}°C, wind {3} km/h, sunrise {4:HH:mm}, sunset {5:HH:mm}",
+                            settings.City, weather.Code, weather.TemperatureC, weather.WindKmh, weather.Sunrise, weather.Sunset,
+                            weather.LowMidCloudPercent, source));
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        failure = failure ?? ex;
+                        Log.Write(source + " failed: " + ex.Message);
+                    }
                 }
-                catch (Exception ex)
+                if (failure != null)
                 {
-                    // Keep the last weather (after a restart, the saved one) so the time of day still
-                    // moves on; try again on the next five-minute tick.
-                    if (weather == null && settings.LastWeather != null) weather = Weather.Load(settings.LastWeather);
-                    var busy = ex is WebException && ((WebException)ex).Response is HttpWebResponse
-                               && (int)((HttpWebResponse)((WebException)ex).Response).StatusCode >= 500;
-                    lastError = (busy ? "Weather service is busy" : "No connection") +
-                                (weather != null ? "; using the last weather" : "") + ". Retrying…";
-                    Log.Write("weather fetch failed: " + ex.Message);
+                    // Both down: the last weather (after a restart, the saved one) while it is under
+                    // 3 hours old, else a clear day; either way with today's sun computed here, so the
+                    // time of day always moves on. Retried on the next five-minute tick.
+                    var stale = last == null || DateTime.UtcNow - last.FetchedUtc > TimeSpan.FromHours(3);
+                    weather = stale ? Weather.Offline(settings.Latitude, settings.Longitude, offset) : last;
+                    weather.UpdateSun(settings.Latitude, settings.Longitude);
+                    var busy = failure is WebException && ((WebException)failure).Response is HttpWebResponse
+                               && (int)((HttpWebResponse)((WebException)failure).Response).StatusCode >= 500;
+                    lastError = (busy ? "Weather services are busy" : "No connection") +
+                                (stale ? "; time of day from this PC" : "; using the last weather") + ". Retrying…";
+                    Log.Write("no weather service (" + (stale ? "clear sky, sun from this PC" : "last weather kept") + ")");
                 }
             }
             Apply();

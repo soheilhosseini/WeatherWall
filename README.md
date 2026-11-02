@@ -80,9 +80,13 @@ night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole b
 
 Weather comes from [Open-Meteo](https://open-meteo.com) (free for non-commercial use, no API
 key). WeatherWall checks the weather hourly, the time of day every five minutes, and changes the
-wallpaper only when the picture should. When the weather service is busy or you are offline, it
-keeps the last weather it saw, so the picture still follows the time of day, and retries every
-five minutes.
+wallpaper only when the picture should. If Open-Meteo is down, it asks
+[MET Norway](https://api.met.no) instead (backup weather data © MET Norway,
+[CC BY 4.0](https://api.met.no/doc/License)). If both are down or you are offline, it keeps
+the last weather it saw for up to three hours, then shows the clear-sky pictures; sunrise
+and sunset are then worked out on your PC
+([NOAA's solar equations](https://gml.noaa.gov/grad/solcalc/solareqns.PDF)), so the picture always
+follows the time of day. It retries the service every five minutes.
 
 Settings and a log live in `%APPDATA%\WeatherWall\`.
 

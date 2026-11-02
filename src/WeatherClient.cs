@@ -26,6 +26,24 @@ namespace WeatherWall
             get { return DateTime.UtcNow.AddSeconds(UtcOffsetSeconds); }
         }
 
+        // No usable weather from the service: a clear, mild day, with the sun worked out on this PC,
+        // so the picture still follows the time of day.
+        public static Weather Offline(double latitude, double longitude, int utcOffsetSeconds)
+        {
+            var w = new Weather { Code = 0, TemperatureC = 15, UtcOffsetSeconds = utcOffsetSeconds, FetchedUtc = DateTime.MinValue };
+            w.UpdateSun(latitude, longitude);
+            return w;
+        }
+
+        // Today's sunrise and sunset from SunTimes, for weather that is kept while the service is down.
+        public void UpdateSun(double latitude, double longitude)
+        {
+            DateTime rise, set;
+            SunTimes.For(latitude, longitude, CityNow.Date, UtcOffsetSeconds, out rise, out set);
+            Sunrise = rise;
+            Sunset = set;
+        }
+
         // One line for settings.json; sunrise and sunset keep only their time of day, which is all
         // SlotFor uses, so an old copy still gives the right part of the day.
         public string Save()
@@ -100,7 +118,8 @@ namespace WeatherWall
             using (var wc = new TimedWebClient())
             {
                 wc.Encoding = Encoding.UTF8;
-                wc.Headers[HttpRequestHeader.UserAgent] = "WeatherWall";
+                // MET Norway's terms ask every client to name itself and a contact (api.met.no/doc/TermsOfService).
+                wc.Headers[HttpRequestHeader.UserAgent] = "WeatherWall/" + Updater.CurrentVersionText + " github.com/soheilhosseini/WeatherWall";
                 var text = wc.DownloadString(url);
                 return new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(text);
             }
@@ -114,6 +133,50 @@ namespace WeatherWall
         static DateTime Iso(object o)
         {
             return DateTime.ParseExact((string)o, "yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+        }
+
+        // The backup service: MET Norway's Locationforecast (free, no key, CC BY 4.0). It sends no
+        // sunrise or sunset, so those are worked out here, at the given offset from UTC.
+        public static Weather FetchMetNo(double lat, double lon, int utcOffsetSeconds)
+        {
+            // MET Norway asks for at most four decimals.
+            var url = string.Format(CultureInfo.InvariantCulture,
+                "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={0:0.####}&lon={1:0.####}", lat, lon);
+            var root = GetJson(url);
+            var now = (Dictionary<string, object>)((IList)((Dictionary<string, object>)root["properties"])["timeseries"])[0];
+            var data = (Dictionary<string, object>)now["data"];
+            var details = (Dictionary<string, object>)((Dictionary<string, object>)data["instant"])["details"];
+            object next;
+            string symbol = null;
+            if (data.TryGetValue("next_1_hours", out next) || data.TryGetValue("next_6_hours", out next))
+                symbol = (string)((Dictionary<string, object>)((Dictionary<string, object>)next)["summary"])["symbol_code"];
+            var w = new Weather
+            {
+                Code = MetNoCode(symbol),
+                TemperatureC = Num(details["air_temperature"]),
+                WindKmh = Num(details["wind_speed"]) * 3.6,
+                LowMidCloudPercent = (int)Math.Round(Math.Max(Num(details["cloud_area_fraction_low"]), Num(details["cloud_area_fraction_medium"]))),
+                UtcOffsetSeconds = utcOffsetSeconds,
+                FetchedUtc = DateTime.UtcNow,
+            };
+            w.UpdateSun(lat, lon);
+            return w;
+        }
+
+        // MET Norway symbol (github.com/metno/weathericons, weather/legend.csv) -> the WMO code the
+        // scenes are chosen by. Sleet counts as rain.
+        public static int MetNoCode(string symbol)
+        {
+            if (string.IsNullOrEmpty(symbol)) return 0;
+            var s = symbol.Split('_')[0];
+            if (s.Contains("thunder")) return 95;
+            if (s.Contains("snow")) return 73;
+            if (s.Contains("rain") || s.Contains("sleet")) return 61;
+            if (s == "fog") return 45;
+            if (s == "cloudy") return 3;
+            if (s == "partlycloudy") return 2;
+            if (s == "fair") return 1;
+            return 0;
         }
 
         public static Weather Fetch(double lat, double lon)

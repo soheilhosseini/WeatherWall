@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 
 namespace WeatherWall.Tests
 {
@@ -13,6 +14,18 @@ namespace WeatherWall.Tests
             if (expected == actual) return;
             failures++;
             Console.WriteLine("FAIL " + what + ": expected " + expected + ", got " + actual);
+        }
+
+        // "HH:mm-HH:mm" pairs equal to within 3 minutes each.
+        static void Near(string expected, string actual, string what)
+        {
+            Func<string, int[]> minutes = s => s.Split('-')
+                .Select(t => int.Parse(t.Substring(0, 2)) * 60 + int.Parse(t.Substring(3, 2))).ToArray();
+            var e = minutes(expected);
+            var a = minutes(actual);
+            if (Math.Abs(e[0] - a[0]) <= 3 && Math.Abs(e[1] - a[1]) <= 3) return;
+            failures++;
+            Console.WriteLine("FAIL " + what + ": expected " + expected + " (±3 min), got " + actual);
         }
 
         static Weather W(int code, double temp, double wind)
@@ -43,6 +56,34 @@ namespace WeatherWall.Tests
             Eq("clear", Scenes.SceneFor(thin), "high cloud alone is not cloudy");
             var thick = W(3, 19, 7); thick.LowMidCloudPercent = 60;
             Eq("cloudy", Scenes.SceneFor(thick), "low or mid cloud is cloudy");
+
+            // MET Norway symbols (the backup service) land on the same scenes.
+            Func<string, string> met = symbol => Scenes.SceneFor(W(WeatherClient.MetNoCode(symbol), 12, 5));
+            Eq("clear", met("clearsky_day"), "MET clear sky");
+            Eq("clear", met("fair_night"), "MET fair");
+            Eq("cloudy", met("partlycloudy_polartwilight"), "MET partly cloudy");
+            Eq("cloudy", met("cloudy"), "MET cloudy");
+            Eq("rain", met("lightrainshowers_day"), "MET rain showers");
+            Eq("rain", met("heavysleet"), "MET sleet counts as rain");
+            Eq("snow", met("snowshowers_night"), "MET snow");
+            Eq("storm", met("lightssleetshowersandthunder"), "MET thunder, spelled as in their legend");
+            Eq("fog", met("fog"), "MET fog");
+            Eq("clear", met(null), "MET without a symbol");
+
+            // Sun worked out on this PC, against what Open-Meteo returned for 2 Nov 2026.
+            Func<double, double, int, string> sun = (lat, lon, offset) =>
+            {
+                DateTime rise, set;
+                SunTimes.For(lat, lon, new DateTime(2026, 11, 2), offset, out rise, out set);
+                return rise.ToString("HH:mm") + "-" + set.ToString("HH:mm");
+            };
+            Near("06:27-17:08", sun(35.69439, 51.42151, 12600), "Tehran sunrise and sunset");
+            Near("07:07-16:42", sun(51.75185, 11.97093, 3600), "Köthen sunrise and sunset");
+            DateTime polarRise, polarSet;
+            SunTimes.For(69.65, 18.96, new DateTime(2026, 12, 21), 3600, out polarRise, out polarSet);
+            Eq("True", (polarRise == polarSet).ToString(), "polar night: the sun never rises, and nothing throws");
+            var offline = Weather.Offline(35.69439, 51.42151, 12600);
+            Eq("clear", Scenes.SceneFor(offline), "no weather at all shows the clear pictures");
 
             // The saved weather that keeps the slots moving while the service is down.
             var saved = W(3, 18.5, 7); saved.LowMidCloudPercent = 26; saved.UtcOffsetSeconds = 12600;

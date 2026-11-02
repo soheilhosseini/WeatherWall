@@ -37,7 +37,7 @@ namespace WeatherWall
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Segoe UI", 9.5f);
-            ClientSize = new Size(480, 430);
+            ClientSize = new Size(480, 450);
 
             var logo = new PictureBox { Image = new Icon(TrayApp.AppIcon, 48, 48).ToBitmap(), SizeMode = PictureBoxSizeMode.Zoom };
             logo.SetBounds(16, 16, 48, 48);
@@ -55,13 +55,15 @@ namespace WeatherWall
             var repo = Link(RepoUrl.Replace("https://", ""), RepoUrl, 290);
             var issues = Link("Report a problem or suggest an idea", RepoUrl + "/issues", 314);
             var weather = Link("Weather data by Open-Meteo.com", "https://open-meteo.com", 338);
+            // CC BY 4.0 asks for credit and the licence link (api.met.no/doc/License).
+            var backup = Link("Backup weather data by MET Norway (CC BY 4.0)", "https://api.met.no/doc/License", 362);
 
             var close = new Button { Text = "Close", DialogResult = DialogResult.Cancel };
-            close.SetBounds(374, 384, 90, 30);
+            close.SetBounds(374, 404, 90, 30);
             close.Click += delegate { Close(); };
             CancelButton = close;
 
-            Controls.AddRange(new Control[] { logo, title, version, storyTitle, story, repo, issues, weather, close });
+            Controls.AddRange(new Control[] { logo, title, version, storyTitle, story, repo, issues, weather, backup, close });
         }
 
         static LinkLabel Link(string text, string url, int y)
