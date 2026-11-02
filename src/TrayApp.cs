@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -28,6 +29,7 @@ namespace WeatherWall
         readonly ToolStripMenuItem updateItem = new ToolStripMenuItem();
         bool updateRunning;
         bool locating;
+        MainForm mainForm;
         int packProgress = -1;   // 0-100 while the image pack downloads, else -1
 
         SynchronizationContext ui;
@@ -49,7 +51,7 @@ namespace WeatherWall
             ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
             tray.Icon = AppIcon;
             tray.Visible = true;
-            tray.DoubleClick += delegate { ChooseCity(); };
+            tray.DoubleClick += delegate { ShowMain(); };
 
             timer.Tick += delegate { Tick(false); };
             timer.Start();
@@ -69,7 +71,7 @@ namespace WeatherWall
             }
             else if (firstRun)
                 tray.ShowBalloonTip(6000, "WeatherWall is running",
-                    "It lives here, next to the clock. Right-click to pick your city.", ToolTipIcon.Info);
+                    "It lives here, next to the clock. Double-click the icon to open it.", ToolTipIcon.Info);
             Tick(true);
         }
 
@@ -184,30 +186,25 @@ namespace WeatherWall
         void BuildMenu()
         {
             var menu = new ContextMenuStrip();
+            var main = new ToolStripMenuItem("Open WeatherWall");
+            main.Font = new Font(main.Font, FontStyle.Bold);
+            main.Click += delegate { ShowMain(); };
+            menu.Items.Add(main);
             menu.Items.Add(statusItem);
             menu.Items.Add(new ToolStripSeparator());
             cityItem.Click += delegate { ChooseCity(); };
             menu.Items.Add(cityItem);
 
-            var names = new[] { "auto" }.Concat(Scenes.All).Concat(Occasions.All.Select(o => "occasion:" + o));
-            foreach (var name in names)
+            foreach (var choice in SceneChoices())
             {
-                var label = name == "auto" ? "Auto (live weather)"
-                    : name.StartsWith("occasion:") ? "Occasion: " + Title(name.Substring(9).Replace('_', ' '))
-                    : Title(name);
-                var item = new ToolStripMenuItem(label) { Tag = name };
-                item.Click += (s, e) =>
-                {
-                    settings.SceneOverride = (string)((ToolStripMenuItem)s).Tag;
-                    settings.Save();
-                    Apply();
-                };
+                var item = new ToolStripMenuItem(choice.Value) { Tag = choice.Key };
+                item.Click += (s, e) => SetScene((string)((ToolStripMenuItem)s).Tag);
                 sceneMenu.DropDownItems.Add(item);
             }
             menu.Items.Add(sceneMenu);
 
             var refresh = new ToolStripMenuItem("Refresh now");
-            refresh.Click += delegate { Tick(true); };
+            refresh.Click += delegate { RefreshNow(); };
             menu.Items.Add(refresh);
 
             var pack = new ToolStripMenuItem("Choose image folder…");
@@ -215,21 +212,22 @@ namespace WeatherWall
             menu.Items.Add(pack);
 
             var open = new ToolStripMenuItem("Open image folder");
-            open.Click += delegate
-            {
-                if (Directory.Exists(settings.PackFolder)) Process.Start("explorer.exe", "\"" + settings.PackFolder + "\"");
-            };
+            open.Click += delegate { OpenPack(); };
             menu.Items.Add(open);
 
-            autostartItem.Click += delegate
-            {
-                Autostart.Set(!Autostart.IsOn, Application.ExecutablePath);
-                UpdateMenu();
-            };
+            autostartItem.Click += delegate { SetAutostart(!Autostart.IsOn); };
             menu.Items.Add(autostartItem);
             updateItem.Text = "Version " + Updater.CurrentVersionText + " · Check for updates";
             updateItem.Click += delegate { CheckForUpdates(true); };
             menu.Items.Add(updateItem);
+            menu.Items.Add(new ToolStripSeparator());
+
+            var share = new ToolStripMenuItem("Share WeatherWall…");
+            share.Click += delegate { ShareForm.ShowFor(currentPath); };
+            menu.Items.Add(share);
+            var about = new ToolStripMenuItem("About…");
+            about.Click += delegate { AboutForm.ShowOnce(); };
+            menu.Items.Add(about);
             menu.Items.Add(new ToolStripSeparator());
 
             var exit = new ToolStripMenuItem("Exit");
@@ -246,8 +244,60 @@ namespace WeatherWall
             return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(s);
         }
 
+        // (setting value, label) for every way the wallpaper can be chosen: live, a scene, a special day.
+        internal static List<KeyValuePair<string, string>> SceneChoices()
+        {
+            var names = new[] { "auto" }.Concat(Scenes.All).Concat(Occasions.All.Select(o => "occasion:" + o));
+            return names.Select(name => new KeyValuePair<string, string>(name,
+                name == "auto" ? "Auto (live weather)"
+                : name.StartsWith("occasion:") ? "Occasion: " + Title(name.Substring(9).Replace('_', ' '))
+                : Title(name))).ToList();
+        }
+
+        // What the main window shows and does; the tray menu uses the same actions.
+        internal Settings Settings { get { return settings; } }
+        internal string Status { get { return StatusText(); } }
+        internal string CurrentWallpaper { get { return currentPath; } }
+
+        internal void ShowMain()
+        {
+            if (mainForm == null || mainForm.IsDisposed) mainForm = new MainForm(this);
+            mainForm.Show();
+            if (mainForm.WindowState == FormWindowState.Minimized) mainForm.WindowState = FormWindowState.Normal;
+            mainForm.Activate();
+        }
+
+        internal void SetScene(string scene)
+        {
+            settings.SceneOverride = scene;
+            settings.Save();
+            Apply();
+        }
+
+        internal void RefreshNow()
+        {
+            Tick(true);
+        }
+
+        internal void OpenPack()
+        {
+            if (Directory.Exists(settings.PackFolder)) Process.Start("explorer.exe", "\"" + settings.PackFolder + "\"");
+        }
+
+        internal void SetAutostart(bool on)
+        {
+            Autostart.Set(on, Application.ExecutablePath);
+            UpdateMenu();
+        }
+
+        internal void CheckUpdatesNow()
+        {
+            CheckForUpdates(true);
+        }
+
         void UpdateMenu()
         {
+            if (mainForm != null && !mainForm.IsDisposed) mainForm.RefreshView();
             cityItem.Text = "Location: " + settings.City + (settings.CityIsManual ? " (chosen)" : " (automatic)") + "…";
             autostartItem.Checked = Autostart.IsOn;
             foreach (ToolStripMenuItem item in sceneMenu.DropDownItems)
@@ -346,7 +396,7 @@ namespace WeatherWall
             UpdateMenu();
         }
 
-        void ChooseCity()
+        internal void ChooseCity()
         {
             using (var form = new CityForm(settings.CityIsManual, settings.City))
             {
@@ -365,7 +415,7 @@ namespace WeatherWall
             Tick(true);
         }
 
-        void ChoosePack()
+        internal void ChoosePack()
         {
             using (var dlg = new FolderBrowserDialog { SelectedPath = settings.PackFolder, Description = "Folder with <scene>_<slot>.jpg images" })
             {

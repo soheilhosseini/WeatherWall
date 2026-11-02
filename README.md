@@ -7,9 +7,39 @@
 <img src="https://raw.githubusercontent.com/soheilhosseini/WeatherWall-Pack/main/showcase/day-cycle.gif" alt="The wallpaper through one day" width="760">
 
 [**⬇ Download WeatherWall.exe**](https://github.com/soheilhosseini/WeatherWall/releases/latest/download/WeatherWall.exe)
-&nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; ~60 KB &nbsp;·&nbsp; free and open source
+&nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; ~100 KB &nbsp;·&nbsp; free and open source
 
 </div>
+
+## The story
+
+Someone I love is moving to another country to study, and for a while we will live far apart.
+
+I made WeatherWall so that every time she looks at her computer, she sees these two cats on her
+desktop — always holding each other, always side by side. Sun or rain, morning or late at night,
+they are together.
+
+We may be far apart in distance, but our hearts are always side by side. That is what these
+pictures say.
+
+<details>
+<summary>به فارسی</summary>
+
+<div dir="rtl">
+
+کسی که دوستش دارم برای درس خواندن به کشور دیگری می‌رود و مدتی از هم دور خواهیم بود.
+
+WeatherWall را ساختم تا هر بار که به کامپیوترش نگاه می‌کند، این دو گربه را روی دسکتاپش ببیند؛ همیشه
+در آغوش هم، همیشه کنار هم. آفتابی یا بارانی، صبح یا نیمه‌شب، با هم‌اند.
+
+شاید از هم دور باشیم، ولی قلب‌هایمان همیشه کنار هم است. این عکس‌ها همین را می‌گویند.
+
+</div>
+</details>
+
+If you are far from someone you love, send it to them.
+
+## What it does
 
 Rain outside? The two cats share an umbrella. Snowing? Knitted hats and a campfire. Late at
 night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole beach dresses up.
@@ -33,7 +63,8 @@ night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole b
    Windows, and downloads the images (about 110 MB, once) — a notification and the tray
    tooltip show the progress. Run with `--portable` to skip the install.
    Windows SmartScreen may warn about a new, unsigned app: **More info → Run anyway**.
-2. Right-click the tray icon:
+2. Double-click the tray icon to open the WeatherWall window — a preview of your wallpaper and
+   every setting in one place. The right-click menu offers the same:
    - **Location…** — automatic or an exact city you search for. Automatic asks the Windows
      location service once an hour (it never shows a prompt; the position is used only for the
      weather request), and falls back to the city of your Windows time zone when Location is
@@ -42,6 +73,9 @@ night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole b
    - **Refresh now**, **Choose image folder…**, **Open image folder**
    - **Start with Windows** — on by default.
    - **Check for updates**
+   - **Share WeatherWall…** — copy the link, send it on Telegram or by email, or save the
+     current wallpaper as a picture.
+   - **About…** — the story behind it, and links to this page.
 
 Weather comes from [Open-Meteo](https://open-meteo.com) (free for non-commercial use, no API
 key). WeatherWall checks the weather hourly, the time of day every five minutes, and changes the
