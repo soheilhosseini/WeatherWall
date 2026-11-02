@@ -57,7 +57,13 @@ namespace WeatherWall
             if (PackIsManagedByUpdates && PackIsEmpty) updateTimer.Interval = 2000;
             updateTimer.Start();
             if (justUpdated)
+            {
                 tray.ShowBalloonTip(5000, "WeatherWall", "Updated to version " + Updater.CurrentVersionText, ToolTipIcon.Info);
+                // The old process may still hold its exe for a moment after handing over; retry later.
+                var cleanup = new System.Windows.Forms.Timer { Interval = 15000 };
+                cleanup.Tick += delegate { cleanup.Stop(); cleanup.Dispose(); Updater.CleanUpOldExe(); };
+                cleanup.Start();
+            }
             else if (firstRun)
                 tray.ShowBalloonTip(6000, "WeatherWall is running",
                     "It lives here, next to the clock. Right-click to pick your city.", ToolTipIcon.Info);
