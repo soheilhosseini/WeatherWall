@@ -16,6 +16,11 @@ function Run([string]$what, [scriptblock]$cmd) {
     if ($LASTEXITCODE) { throw "$what failed (exit $LASTEXITCODE)" }
 }
 
+# A released version cannot be released again: stop before anything is built or committed.
+if (git ls-remote --tags origin "refs/tags/v$Version") {
+    throw "v$Version is already released. Use a higher version number."
+}
+
 $info = Join-Path $root 'src\AssemblyInfo.cs'
 $text = [IO.File]::ReadAllText($info) -replace 'Version\("[0-9.]+"\)', "Version(""$Version"")"
 [IO.File]::WriteAllText($info, $text)
