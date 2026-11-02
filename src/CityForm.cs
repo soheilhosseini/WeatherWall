@@ -1,14 +1,17 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace WeatherWall
 {
-    // Location window: follow the Windows time zone (default) or pick an exact city.
+    // Location window: automatic (Windows location, else the Windows time zone) or an exact city.
     public class CityForm : Form
     {
         readonly RadioButton autoChoice = new RadioButton();
         readonly Label autoDetail = new Label();
+        readonly LinkLabel locationSettings = new LinkLabel();
         readonly RadioButton manualChoice = new RadioButton();
         readonly TextBox query = new TextBox();
         readonly Button search = new Button();
@@ -37,24 +40,32 @@ namespace WeatherWall
                 Location = new Point(16, 14), AutoSize = true, ForeColor = SystemColors.GrayText,
             };
 
-            autoChoice.Text = "Automatic — follow the Windows time zone (recommended)";
+            autoChoice.Text = "Automatic — where this PC is (recommended)";
             autoChoice.Font = new Font(Font, FontStyle.Bold);
             autoChoice.SetBounds(16, 44, 430, 24);
             autoDetail.SetBounds(36, 70, 410, 40);
-            autoDetail.Text = AutoCity.CurrentZoneDisplayName() + "\nLooking up the city…";
+            autoDetail.Text = "Asking Windows where this PC is…";
+            locationSettings.Text = "Windows location settings…";
+            locationSettings.Location = new Point(36, 112);
+            locationSettings.AutoSize = true;
+            locationSettings.LinkClicked += delegate
+            {
+                try { Process.Start("ms-settings:privacy-location"); }
+                catch (Exception) { }
+            };
 
             manualChoice.Text = "Choose an exact city";
             manualChoice.Font = new Font(Font, FontStyle.Bold);
-            manualChoice.SetBounds(16, 122, 430, 24);
+            manualChoice.SetBounds(16, 144, 430, 24);
             var hint = new Label
             {
                 Text = "Type a city name, press Search, then pick it from the list.",
-                Location = new Point(36, 148), AutoSize = true, ForeColor = SystemColors.GrayText,
+                Location = new Point(36, 170), AutoSize = true, ForeColor = SystemColors.GrayText,
             };
-            query.SetBounds(36, 174, 312, 26);
+            query.SetBounds(36, 196, 312, 26);
             search.Text = "Search";
-            search.SetBounds(356, 173, 90, 28);
-            results.SetBounds(36, 208, 410, 150);
+            search.SetBounds(356, 195, 90, 28);
+            results.SetBounds(36, 230, 410, 128);
             status.SetBounds(36, 362, 410, 20);
             status.ForeColor = SystemColors.GrayText;
             if (manual) status.Text = "Current: " + currentCity;
@@ -76,21 +87,39 @@ namespace WeatherWall
             save.Click += delegate { Save(); };
 
             Controls.AddRange(new Control[]
-                { intro, autoChoice, autoDetail, manualChoice, hint, query, search, results, status, save, cancel });
+                { intro, autoChoice, autoDetail, locationSettings, manualChoice, hint, query, search, results, status, save, cancel });
             autoChoice.Checked = !manual;
             manualChoice.Checked = manual;
             UpdateEnabled();
             Shown += delegate { ShowAutoCity(); };
         }
 
+        // The same order the tray app uses: the Windows position, else the time-zone city. Runs on a
+        // pool thread, since Windows can take a few seconds to answer.
         void ShowAutoCity()
         {
-            Refresh();
-            City city = null;
-            try { city = AutoCity.Resolve(AutoCity.CurrentWindowsZone()); }
-            catch (Exception) { }
-            autoDetail.Text = AutoCity.CurrentZoneDisplayName() + "\n→ " +
-                (city != null ? city.Label : "no city for this time zone (or offline) — choose one below");
+            var zone = AutoCity.CurrentWindowsZone();
+            var zoneName = AutoCity.CurrentZoneDisplayName();
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                City city = null;
+                try { city = AutoCity.Resolve(zone); }
+                catch (Exception) { }
+                double lat, lon;
+                var outcome = WindowsLocation.Outcome.NoFix;
+                try { outcome = WindowsLocation.TryGet(TimeSpan.FromSeconds(15), out lat, out lon); }
+                catch (Exception) { lat = lon = 0; }
+                string text;
+                if (outcome == WindowsLocation.Outcome.Found)
+                    text = "From Windows location:\n→ " + WindowsLocation.LabelFor(lat, lon, city);
+                else
+                    text = (outcome == WindowsLocation.Outcome.Off
+                               ? "Windows location is off, so the time zone is used:\n"
+                               : "Windows has no position yet, so the time zone is used:\n")
+                           + zoneName + " → " + (city != null ? city.Label : "no city (or offline) — choose one below");
+                try { BeginInvoke((Action)delegate { autoDetail.Text = text; }); }
+                catch (InvalidOperationException) { }   // the window was closed meanwhile
+            });
         }
 
         void UpdateEnabled()

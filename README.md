@@ -20,7 +20,8 @@ night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole b
 - **Real sunrise and sunset**: dawn, morning, noon, afternoon, sunset, night and late night.
 - **Special days**: Nowruz, Sizdah Bedar, Chaharshanbe Suri, Yalda, New Year, Christmas,
   Halloween, Valentine's Day, Easter and Lunar New Year — calculated, never a fixed table.
-- **Zero setup**: the city follows your Windows time zone; pick an exact city if you like.
+- **Zero setup**: it uses where your PC is (Windows location), or your Windows time zone when
+  location is off; pick an exact city if you like.
 - **Tiny and quiet**: lives next to the clock, starts with Windows, no admin rights, no runtime
   to install, no account, no tracking.
 - **Updates itself**, safely: every update is cryptographically signed.
@@ -33,7 +34,10 @@ night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole b
    tooltip show the progress. Run with `--portable` to skip the install.
    Windows SmartScreen may warn about a new, unsigned app: **More info → Run anyway**.
 2. Right-click the tray icon:
-   - **Location…** — automatic (your Windows time zone) or an exact city you search for.
+   - **Location…** — automatic or an exact city you search for. Automatic asks the Windows
+     location service once an hour (it never shows a prompt; the position is used only for the
+     weather request), and falls back to the city of your Windows time zone when Location is
+     turned off in *Settings → Privacy & security → Location*.
    - **Scene** — Auto, or pin a scene / special day to preview it.
    - **Refresh now**, **Choose image folder…**, **Open image folder**
    - **Start with Windows** — on by default.

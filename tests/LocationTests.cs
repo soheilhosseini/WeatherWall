@@ -26,6 +26,14 @@ namespace WeatherWall.Tests
             Eq(null, AutoCity.CityNameFor(null), "no zone");
             Eq("Kamchatka", AutoCity.CityNameFor("Kamchatka Standard Time"), "retired zone still resolves");
 
+            // Windows location: Open-Meteo cannot name a position, so a nearby time-zone city does.
+            var tehran = new City { Label = "Tehran, Iran", Latitude = 35.69439, Longitude = 51.42151 };
+            var km = WindowsLocation.DistanceKm(35.69439, 51.42151, 35.83266, 50.99155);   // Tehran -> Karaj
+            if (km < 38 || km > 44) { failures++; Console.WriteLine("FAIL Tehran-Karaj distance: " + km); }
+            Eq("Near Tehran, Iran", WindowsLocation.LabelFor(35.83266, 50.99155, tehran), "position near the zone city");
+            Eq("29.59, 52.58", WindowsLocation.LabelFor(29.59, 52.58, tehran), "position far from the zone city (Shiraz)");
+            Eq("35.70, 51.40", WindowsLocation.LabelFor(35.7, 51.4, null), "no zone city");
+
             // Derived, not restated: every time zone this Windows knows must be in the CLDR table,
             // or a user in that zone silently gets no automatic city.
             var missing = TimeZoneInfo.GetSystemTimeZones()

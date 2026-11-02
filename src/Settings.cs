@@ -11,6 +11,8 @@ namespace WeatherWall
         public bool CityIsManual { get; set; }
         // The Windows time zone the automatic City was found for; a change triggers a new lookup.
         public string AutoZone { get; set; }
+        // True when the automatic City came from the Windows location service, not the time zone.
+        public bool FromWindowsLocation { get; set; }
         public string City { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }

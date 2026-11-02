@@ -27,6 +27,7 @@ namespace WeatherWall
         readonly System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer { Interval = 30 * 1000 };
         readonly ToolStripMenuItem updateItem = new ToolStripMenuItem();
         bool updateRunning;
+        bool locating;
         int packProgress = -1;   // 0-100 while the image pack downloads, else -1
 
         SynchronizationContext ui;
@@ -283,9 +284,15 @@ namespace WeatherWall
 
         void Tick(bool forceFetch)
         {
+            Tick(forceFetch, true);
+        }
+
+        void Tick(bool forceFetch, bool askWindowsLocation)
+        {
             if (FollowWindowsTimeZone()) forceFetch = true;
             if (forceFetch || weather == null || DateTime.UtcNow - weather.FetchedUtc >= TimeSpan.FromMinutes(60))
             {
+                if (askWindowsLocation) FollowWindowsLocation();
                 try
                 {
                     weather = WeatherClient.Fetch(settings.Latitude, settings.Longitude);
@@ -344,6 +351,7 @@ namespace WeatherWall
             {
                 if (form.ShowDialog() != DialogResult.OK) return;
                 settings.CityIsManual = !form.Automatic;
+                settings.FromWindowsLocation = false;
                 if (form.Automatic) settings.AutoZone = null;   // look it up again now
                 else
                 {
@@ -394,11 +402,69 @@ namespace WeatherWall
             ui.Post(delegate { Tick(true); }, null);
         }
 
-        // In automatic mode, (re)find the city whenever the Windows time zone differs from the one
-        // the current city was found for. Returns true when the city changed.
+        // In automatic mode, ask Windows where the PC is, on a pool thread. A new position (more than
+        // 5 km away), or Location turned off in Windows, refreshes the weather once the answer is back.
+        void FollowWindowsLocation()
+        {
+            if (settings.CityIsManual || locating) return;
+            locating = true;
+            var zone = AutoCity.CurrentWindowsZone();
+            var known = settings.FromWindowsLocation;
+            var oldLat = settings.Latitude;
+            var oldLon = settings.Longitude;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                double lat = 0, lon = 0;
+                string label = null;
+                var outcome = WindowsLocation.Outcome.NoFix;
+                try
+                {
+                    outcome = WindowsLocation.TryGet(TimeSpan.FromSeconds(15), out lat, out lon);
+                    if (outcome == WindowsLocation.Outcome.Found
+                        && (!known || WindowsLocation.DistanceKm(oldLat, oldLon, lat, lon) > 5))
+                    {
+                        City nearby = null;
+                        try { nearby = AutoCity.Resolve(zone); }
+                        catch (Exception) { }   // offline: the label falls back to coordinates
+                        label = WindowsLocation.LabelFor(lat, lon, nearby);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("windows location failed: " + ex.Message);
+                }
+                ui.Post(delegate
+                {
+                    locating = false;
+                    if (settings.CityIsManual) return;   // the user picked a city meanwhile
+                    if (label != null)
+                    {
+                        settings.City = label;
+                        settings.Latitude = lat;
+                        settings.Longitude = lon;
+                        settings.FromWindowsLocation = true;
+                        settings.AutoZone = zone;
+                        settings.Save();
+                        Log.Write("windows location -> " + label);
+                        Tick(true, false);
+                    }
+                    else if (outcome == WindowsLocation.Outcome.Off && settings.FromWindowsLocation)
+                    {
+                        settings.FromWindowsLocation = false;
+                        settings.AutoZone = null;
+                        settings.Save();
+                        Log.Write("windows location is off; following the time zone");
+                        Tick(true, false);
+                    }
+                }, null);
+            });
+        }
+
+        // In automatic mode without a Windows position, (re)find the city whenever the Windows time
+        // zone differs from the one the current city was found for. Returns true when it changed.
         bool FollowWindowsTimeZone()
         {
-            if (settings.CityIsManual) return false;
+            if (settings.CityIsManual || settings.FromWindowsLocation) return false;
             var zone = AutoCity.CurrentWindowsZone();
             if (zone == settings.AutoZone) return false;
             try
