@@ -11,9 +11,11 @@ A tiny Windows tray app that changes your desktop wallpaper to match the **live 
 
 ## Use
 
-1. Build it (below) or take `WeatherWall.exe` from a release.
-2. Put a `pack` folder of images next to the exe (or pick any folder from the tray menu).
-3. Run `WeatherWall.exe`. Right-click the tray icon:
+1. Download `WeatherWall.exe` from the [latest release](https://github.com/soheilhosseini/WeatherWall/releases/latest)
+   and run it. It installs itself into `%LOCALAPPDATA%\Programs\WeatherWall` (no admin rights),
+   starts with Windows, and downloads the image pack on its own. Run with `--portable` to skip
+   the install.
+2. Right-click the tray icon:
    - **City…** — search any city (Open-Meteo geocoding).
    - **Scene** — Auto, or pin a scene / occasion to preview it.
    - **Refresh now**, **Choose image folder…**, **Open image folder**

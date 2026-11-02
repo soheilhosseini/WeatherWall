@@ -35,7 +35,8 @@ namespace WeatherWall
 
         public TrayApp(bool justUpdated)
         {
-            if (!settings.FirstRunDone)
+            var firstRun = !settings.FirstRunDone;
+            if (firstRun)
             {
                 Autostart.Set(true, Application.ExecutablePath);
                 settings.FirstRunDone = true;
@@ -52,10 +53,20 @@ namespace WeatherWall
             timer.Start();
             SystemEvents.PowerModeChanged += OnPowerModeChanged;
             updateTimer.Tick += delegate { updateTimer.Interval = 24 * 60 * 60 * 1000; CheckForUpdates(false); };
+            // A fresh install has no images yet: fetch the pack right away instead of in 30 s.
+            if (PackIsManagedByUpdates && PackIsEmpty) updateTimer.Interval = 2000;
             updateTimer.Start();
             if (justUpdated)
                 tray.ShowBalloonTip(5000, "WeatherWall", "Updated to version " + Updater.CurrentVersionText, ToolTipIcon.Info);
+            else if (firstRun)
+                tray.ShowBalloonTip(6000, "WeatherWall is running",
+                    "It lives here, next to the clock. Right-click to pick your city.", ToolTipIcon.Info);
             Tick(true);
+        }
+
+        bool PackIsEmpty
+        {
+            get { return !Directory.Exists(settings.PackFolder) || !Directory.EnumerateFiles(settings.PackFolder).Any(); }
         }
 
         bool PackIsManagedByUpdates
