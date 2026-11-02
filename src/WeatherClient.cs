@@ -13,6 +13,9 @@ namespace WeatherWall
         public int Code;            // WMO weather code
         public double TemperatureC;
         public double WindKmh;
+        // The larger of the low (< 3 km) and mid (3-8 km) cloud cover, in %. High, thin cloud is left
+        // out: it can make the WMO code "overcast" while the sun still shines. Null = not known.
+        public int? LowMidCloudPercent;
         public DateTime Sunrise;    // in the city's local time
         public DateTime Sunset;
         public int UtcOffsetSeconds;
@@ -67,7 +70,7 @@ namespace WeatherWall
         {
             var url = string.Format(CultureInfo.InvariantCulture,
                 "https://api.open-meteo.com/v1/forecast?latitude={0}&longitude={1}" +
-                "&current=weather_code,temperature_2m,wind_speed_10m" +
+                "&current=weather_code,temperature_2m,wind_speed_10m,cloud_cover_low,cloud_cover_mid" +
                 "&daily=sunrise,sunset&timezone=auto&forecast_days=1",
                 lat, lon);
             var root = GetJson(url);
@@ -78,6 +81,7 @@ namespace WeatherWall
                 Code = (int)Num(current["weather_code"]),
                 TemperatureC = Num(current["temperature_2m"]),
                 WindKmh = Num(current["wind_speed_10m"]),
+                LowMidCloudPercent = (int)Math.Round(Math.Max(Num(current["cloud_cover_low"]), Num(current["cloud_cover_mid"]))),
                 Sunrise = Iso(((IList)daily["sunrise"])[0]),
                 Sunset = Iso(((IList)daily["sunset"])[0]),
                 UtcOffsetSeconds = (int)Num(root["utc_offset_seconds"]),

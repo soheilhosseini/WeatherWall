@@ -38,6 +38,11 @@ namespace WeatherWall.Tests
             Eq("cold", Scenes.SceneFor(W(3, 1, 5)), "cold beats cloudy");
             Eq("cloudy", Scenes.SceneFor(W(3, 12, 5)), "cloudy");
             Eq("clear", Scenes.SceneFor(W(1, 12, 5)), "clear");
+            // Overcast only with high, thin cloud (Tehran, 2 Nov 2026: low 26 %, mid 16 %, full sun).
+            var thin = W(3, 19, 7); thin.LowMidCloudPercent = 26;
+            Eq("clear", Scenes.SceneFor(thin), "high cloud alone is not cloudy");
+            var thick = W(3, 19, 7); thick.LowMidCloudPercent = 60;
+            Eq("cloudy", Scenes.SceneFor(thick), "low or mid cloud is cloudy");
 
             // Sunrise 06:00, sunset 18:00.
             var w = W(0, 15, 0);
@@ -47,6 +52,7 @@ namespace WeatherWall.Tests
             Eq("dawn", at(6, 40), "06:40");
             Eq("morning", at(8, 0), "08:00");
             Eq("noon", at(12, 0), "12:00");
+            Eq("noon", at(14, 30), "14:30 is still noon light, not the low afternoon sun");
             Eq("afternoon", at(15, 0), "15:00");
             Eq("sunset", at(17, 30), "17:30");
             Eq("sunset", at(18, 20), "18:20");

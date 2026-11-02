@@ -298,8 +298,9 @@ namespace WeatherWall
                     weather = WeatherClient.Fetch(settings.Latitude, settings.Longitude);
                     lastError = null;
                     Log.Write(string.Format(CultureInfo.InvariantCulture,
-                        "weather for {0}: code {1}, {2}°C, wind {3} km/h, sunrise {4:HH:mm}, sunset {5:HH:mm}",
-                        settings.City, weather.Code, weather.TemperatureC, weather.WindKmh, weather.Sunrise, weather.Sunset));
+                        "weather for {0}: code {1}, low/mid cloud {6}%, {2}°C, wind {3} km/h, sunrise {4:HH:mm}, sunset {5:HH:mm}",
+                        settings.City, weather.Code, weather.TemperatureC, weather.WindKmh, weather.Sunrise, weather.Sunset,
+                        weather.LowMidCloudPercent));
                 }
                 catch (Exception ex)
                 {

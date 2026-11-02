@@ -62,7 +62,7 @@ A pack is a folder of images named `<scene>_<slot>.jpg` (`.png` and `.bmp` work 
 | `wind` | wind ≥ 40 km/h |
 | `hot` | ≥ 30 °C |
 | `cold` | ≤ 5 °C |
-| `cloudy` | partly cloudy / overcast (2, 3) |
+| `cloudy` | partly cloudy / overcast (2, 3) with at least 40 % low or mid cloud — high, thin cloud alone leaves the sun out, so it stays `clear` |
 | `clear` | everything else |
 
 The first match in that order wins.
@@ -71,7 +71,7 @@ The first match in that order wins.
 |---|---|
 | `dawn` | sunrise ± 45 min |
 | `morning` | until 35 % of the daylight |
-| `noon` | until 65 % of the daylight |
+| `noon` | until 75 % of the daylight |
 | `afternoon` | until 1 h before sunset |
 | `sunset` | 1 h before to 30 min after sunset |
 | `night` | evening until 23:00 |

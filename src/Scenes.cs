@@ -35,7 +35,7 @@ namespace WeatherWall
             if (w.WindKmh >= 40) return "wind";
             if (w.TemperatureC >= 30) return "hot";
             if (w.TemperatureC <= 5) return "cold";
-            if (c == 2 || c == 3) return "cloudy";
+            if ((c == 2 || c == 3) && (w.LowMidCloudPercent ?? 100) >= 40) return "cloudy";
             return "clear";
         }
 
@@ -46,7 +46,7 @@ namespace WeatherWall
             var day = set - rise;
             if (cityNow >= rise.AddMinutes(-45) && cityNow < rise.AddMinutes(45)) return "dawn";
             if (cityNow >= rise.AddMinutes(45) && cityNow < rise + TimeSpan.FromTicks((long)(day.Ticks * 0.35))) return "morning";
-            if (cityNow >= rise && cityNow < rise + TimeSpan.FromTicks((long)(day.Ticks * 0.65))) return "noon";
+            if (cityNow >= rise && cityNow < rise + TimeSpan.FromTicks((long)(day.Ticks * 0.75))) return "noon";
             if (cityNow >= rise && cityNow < set.AddMinutes(-60)) return "afternoon";
             if (cityNow >= set.AddMinutes(-60) && cityNow < set.AddMinutes(30)) return "sunset";
             if (cityNow.Hour >= 23 || cityNow < rise.AddMinutes(-45)) return "latenight";
