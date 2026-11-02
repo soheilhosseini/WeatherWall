@@ -22,14 +22,34 @@ namespace WeatherWall
 
             bool isFirst;
             using (var mutex = new Mutex(true, "WeatherWall.SingleInstance", out isFirst))
+            using (var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, "WeatherWall.ShowWindow"))
             {
                 // Right after a self-update the old process is still closing; wait for it.
                 if (!isFirst && args.Contains("--updated")) isFirst = WaitFor(mutex);
-                if (!isFirst) return;
+                if (!isFirst)
+                {
+                    // Already running (a shortcut, or the exe opened again): bring up its window.
+                    showSignal.Set();
+                    return;
+                }
+                // Log every failure instead of a dialog or a silent exit, and keep running.
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (s, e) => Log.Write("unexpected error: " + e.Exception);
+                AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                    Log.Write("fatal error (exiting): " + e.ExceptionObject);
                 Updater.CleanUpOldExe();
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new TrayApp(args.Contains("--updated")));
+                Application.Run(new TrayApp(args.Contains("--updated"), args.Contains("--show"), showSignal));
+            }
+        }
+
+        public static bool IsInstalledCopy
+        {
+            get
+            {
+                return string.Equals(Path.GetFullPath(Application.ExecutablePath),
+                    Path.GetFullPath(Path.Combine(InstallDir, "WeatherWall.exe")), StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -51,7 +71,8 @@ namespace WeatherWall
             {
                 // The installed copy is running and locked: it is already installed, just let it be.
             }
-            Process.Start(installed);
+            // The user opened this copy on purpose: show the window, not just a tray icon.
+            Process.Start(installed, "--show");
             return true;
         }
 

@@ -20,6 +20,10 @@ namespace WeatherWall
         // "auto", or a scene name to pin the wallpaper to that scene.
         public string SceneOverride { get; set; }
         public bool FirstRunDone { get; set; }
+        // The Start menu and desktop shortcuts were made once; never recreated behind the user's back.
+        public bool ShortcutsDone { get; set; }
+        // The last weather that arrived (Weather.Save), so slots keep changing while the service is down.
+        public string LastWeather { get; set; }
         // Signature of the pack.zip last installed by the updater.
         public string PackSignature { get; set; }
 

@@ -44,6 +44,15 @@ namespace WeatherWall.Tests
             var thick = W(3, 19, 7); thick.LowMidCloudPercent = 60;
             Eq("cloudy", Scenes.SceneFor(thick), "low or mid cloud is cloudy");
 
+            // The saved weather that keeps the slots moving while the service is down.
+            var saved = W(3, 18.5, 7); saved.LowMidCloudPercent = 26; saved.UtcOffsetSeconds = 12600;
+            saved.Sunrise = new DateTime(2026, 11, 2, 6, 27, 0); saved.Sunset = new DateTime(2026, 11, 2, 17, 8, 0);
+            var back = Weather.Load(saved.Save());
+            Eq("3 18.5 7 26 06:27 17:08 12600", back == null ? "null" : string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "{0} {1} {2} {3} {4:HH:mm} {5:HH:mm} {6}", back.Code, back.TemperatureC, back.WindKmh, back.LowMidCloudPercent,
+                back.Sunrise, back.Sunset, back.UtcOffsetSeconds), "saved weather round trip");
+            Eq("null", Weather.Load("from an older version") == null ? "null" : "loaded", "unreadable saved weather");
+
             // Sunrise 06:00, sunset 18:00.
             var w = W(0, 15, 0);
             Func<int, int, string> at = (h, m) => Scenes.SlotFor(w, new DateTime(2026, 11, 2, h, m, 0));

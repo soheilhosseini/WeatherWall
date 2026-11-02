@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -37,8 +38,9 @@ namespace WeatherWall
         string currentPath;
         string lastError;
 
-        public TrayApp(bool justUpdated)
+        public TrayApp(bool justUpdated, bool showWindow, EventWaitHandle showSignal)
         {
+            Log.Write("started version " + Updater.CurrentVersionText + " from " + Application.ExecutablePath);
             var firstRun = !settings.FirstRunDone;
             if (firstRun)
             {
@@ -46,12 +48,16 @@ namespace WeatherWall
                 settings.FirstRunDone = true;
                 settings.Save();
             }
+            CreateShortcutsOnce();
 
             BuildMenu();
             ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
             tray.Icon = AppIcon;
             tray.Visible = true;
             tray.DoubleClick += delegate { ShowMain(); };
+            ThreadPool.RegisterWaitForSingleObject(showSignal,
+                delegate { ui.Post(delegate { ShowMain(); }, null); }, null, Timeout.Infinite, false);
+            SystemEvents.SessionEnding += OnSessionEnding;
 
             timer.Tick += delegate { Tick(false); };
             timer.Start();
@@ -73,6 +79,38 @@ namespace WeatherWall
                 tray.ShowBalloonTip(6000, "WeatherWall is running",
                     "It lives here, next to the clock. Double-click the icon to open it.", ToolTipIcon.Info);
             Tick(true);
+            if (showWindow) ShowMain();
+        }
+
+        // A Start menu and a desktop shortcut, made once for the installed copy. Deleting the desktop
+        // one is respected: it comes back only from the checkbox in the window.
+        void CreateShortcutsOnce()
+        {
+            if (settings.ShortcutsDone || !Program.IsInstalledCopy) return;
+            try
+            {
+                Shortcuts.SetStartMenu(true, Application.ExecutablePath);
+                Shortcuts.SetDesktop(true, Application.ExecutablePath);
+                Log.Write("shortcuts created");
+            }
+            catch (Exception ex)
+            {
+                Log.Write("could not create shortcuts: " + ex.Message);
+            }
+            settings.ShortcutsDone = true;
+            settings.Save();
+        }
+
+        internal void SetDesktopShortcut(bool on)
+        {
+            try { Shortcuts.SetDesktop(on, Application.ExecutablePath); }
+            catch (Exception ex) { Log.Write("desktop shortcut failed: " + ex.Message); }
+            UpdateMenu();
+        }
+
+        void OnSessionEnding(object sender, SessionEndingEventArgs e)
+        {
+            Log.Write("windows session ending (" + e.Reason + ")");
         }
 
         bool PackIsEmpty
@@ -223,7 +261,7 @@ namespace WeatherWall
             menu.Items.Add(new ToolStripSeparator());
 
             var share = new ToolStripMenuItem("Share WeatherWall…");
-            share.Click += delegate { ShareForm.ShowFor(currentPath); };
+            share.Click += delegate { ShareForm.ShowFor(CurrentWallpaper); };
             menu.Items.Add(share);
             var about = new ToolStripMenuItem("About…");
             about.Click += delegate { AboutForm.ShowOnce(); };
@@ -257,7 +295,17 @@ namespace WeatherWall
         // What the main window shows and does; the tray menu uses the same actions.
         internal Settings Settings { get { return settings; } }
         internal string Status { get { return StatusText(); } }
-        internal string CurrentWallpaper { get { return currentPath; } }
+        // Before the first weather arrives (offline, or the service is down) this is the picture
+        // Windows shows now, which is usually the one WeatherWall set last time.
+        internal string CurrentWallpaper
+        {
+            get
+            {
+                if (currentPath != null) return currentPath;
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop"))
+                    return key == null ? null : key.GetValue("WallPaper") as string;
+            }
+        }
 
         internal void ShowMain()
         {
@@ -347,6 +395,8 @@ namespace WeatherWall
                 {
                     weather = WeatherClient.Fetch(settings.Latitude, settings.Longitude);
                     lastError = null;
+                    settings.LastWeather = weather.Save();
+                    settings.Save();
                     Log.Write(string.Format(CultureInfo.InvariantCulture,
                         "weather for {0}: code {1}, low/mid cloud {6}%, {2}°C, wind {3} km/h, sunrise {4:HH:mm}, sunset {5:HH:mm}",
                         settings.City, weather.Code, weather.TemperatureC, weather.WindKmh, weather.Sunrise, weather.Sunset,
@@ -354,9 +404,14 @@ namespace WeatherWall
                 }
                 catch (Exception ex)
                 {
-                    // Keep the last weather; try again on the next tick.
-                    lastError = "No connection: " + ex.Message;
-                    Log.Write("weather fetch failed: " + ex);
+                    // Keep the last weather (after a restart, the saved one) so the time of day still
+                    // moves on; try again on the next five-minute tick.
+                    if (weather == null && settings.LastWeather != null) weather = Weather.Load(settings.LastWeather);
+                    var busy = ex is WebException && ((WebException)ex).Response is HttpWebResponse
+                               && (int)((HttpWebResponse)((WebException)ex).Response).StatusCode >= 500;
+                    lastError = (busy ? "Weather service is busy" : "No connection") +
+                                (weather != null ? "; using the last weather" : "") + ". Retrying…";
+                    Log.Write("weather fetch failed: " + ex.Message);
                 }
             }
             Apply();
@@ -546,6 +601,8 @@ namespace WeatherWall
 
         protected override void ExitThreadCore()
         {
+            Log.Write("exiting");
+            SystemEvents.SessionEnding -= OnSessionEnding;
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
             SystemEvents.TimeChanged -= OnTimeChanged;
             timer.Stop();

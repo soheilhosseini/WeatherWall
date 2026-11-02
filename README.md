@@ -63,8 +63,9 @@ night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole b
    Windows, and downloads the images (about 110 MB, once) — a notification and the tray
    tooltip show the progress. Run with `--portable` to skip the install.
    Windows SmartScreen may warn about a new, unsigned app: **More info → Run anyway**.
-2. Double-click the tray icon to open the WeatherWall window — a preview of your wallpaper and
-   every setting in one place. The right-click menu offers the same:
+2. Open the WeatherWall window from the desktop or Start menu shortcut, or by double-clicking
+   the tray icon (Windows 11 may tuck it under the **^** arrow next to the clock) — a preview of
+   your wallpaper and every setting in one place. The right-click menu offers the same:
    - **Location…** — automatic or an exact city you search for. Automatic asks the Windows
      location service once an hour (it never shows a prompt; the position is used only for the
      weather request), and falls back to the city of your Windows time zone when Location is
@@ -79,7 +80,9 @@ night they fall asleep, and on Nowruz, Yalda, Halloween or Christmas the whole b
 
 Weather comes from [Open-Meteo](https://open-meteo.com) (free for non-commercial use, no API
 key). WeatherWall checks the weather hourly, the time of day every five minutes, and changes the
-wallpaper only when the picture should.
+wallpaper only when the picture should. When the weather service is busy or you are offline, it
+keeps the last weather it saw, so the picture still follows the time of day, and retries every
+five minutes.
 
 Settings and a log live in `%APPDATA%\WeatherWall\`.
 

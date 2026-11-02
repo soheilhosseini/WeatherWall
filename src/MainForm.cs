@@ -18,6 +18,7 @@ namespace WeatherWall
         readonly ComboBox scene = new ComboBox();
         readonly Label pack = new Label();
         readonly CheckBox autostart = new CheckBox();
+        readonly CheckBox desktopShortcut = new CheckBox();
         readonly System.Collections.Generic.List<string> sceneKeys;
         string previewPath;
         bool updating;
@@ -31,7 +32,7 @@ namespace WeatherWall
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Segoe UI", 9.5f);
-            ClientSize = new Size(640, 456);
+            ClientSize = new Size(640, 484);
 
             preview.SetBounds(16, 16, 300, 169);
             preview.SizeMode = PictureBoxSizeMode.Zoom;
@@ -73,20 +74,23 @@ namespace WeatherWall
             autostart.Text = "Start with Windows";
             autostart.SetBounds(x, 276, w, 24);
             autostart.CheckedChanged += delegate { if (!updating) app.SetAutostart(autostart.Checked); };
+            desktopShortcut.Text = "Shortcut on the desktop";
+            desktopShortcut.SetBounds(x, 302, w, 24);
+            desktopShortcut.CheckedChanged += delegate { if (!updating) app.SetDesktopShortcut(desktopShortcut.Checked); };
 
-            var version = new Label { Text = "Version " + Updater.CurrentVersionText + " · updates itself", AutoSize = true, Location = new Point(x, 334) };
-            var checkUpdates = Button("Check for updates", x, 356, 160);
+            var version = new Label { Text = "Version " + Updater.CurrentVersionText + " · updates itself", AutoSize = true, Location = new Point(x, 362) };
+            var checkUpdates = Button("Check for updates", x, 384, 160);
             checkUpdates.Click += delegate { app.CheckUpdatesNow(); };
 
             var line = new Label { BorderStyle = BorderStyle.Fixed3D };
-            line.SetBounds(16, 400, 608, 2);
-            var share = Button("Share…", 16, 412, 100);
+            line.SetBounds(16, 428, 608, 2);
+            var share = Button("Share…", 16, 440, 100);
             share.Click += delegate { ShareForm.ShowFor(app.CurrentWallpaper); };
-            var about = Button("About…", 122, 412, 100);
+            var about = Button("About…", 122, 440, 100);
             about.Click += delegate { AboutForm.ShowOnce(); };
-            var refresh = Button("Refresh now", 228, 412, 110);
+            var refresh = Button("Refresh now", 228, 440, 110);
             refresh.Click += delegate { app.RefreshNow(); };
-            var close = Button("Close", 534, 412, 90);
+            var close = Button("Close", 534, 440, 90);
             close.Click += delegate { Close(); };
             CancelButton = close;
 
@@ -96,8 +100,8 @@ namespace WeatherWall
                 Header("Location", x, 16), location, locationMode, changeLocation,
                 Header("Picture", x, 124), scene,
                 Header("Images", x, 188), pack, choosePack, openPack,
-                autostart,
-                Header("Updates", x, 312), version, checkUpdates,
+                autostart, desktopShortcut,
+                Header("Updates", x, 340), version, checkUpdates,
                 line, share, about, refresh, close,
             });
             RefreshView();
@@ -128,6 +132,7 @@ namespace WeatherWall
             scene.SelectedIndex = Math.Max(0, sceneKeys.IndexOf(s.SceneOverride));
             pack.Text = s.PackFolder;
             autostart.Checked = Autostart.IsOn;
+            desktopShortcut.Checked = Shortcuts.OnDesktop;
             updating = false;
             ShowPreview(app.CurrentWallpaper);
         }

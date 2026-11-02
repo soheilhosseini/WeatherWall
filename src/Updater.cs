@@ -89,7 +89,7 @@ namespace WeatherWall
 
         static WebClient Client()
         {
-            var wc = new WebClient { Encoding = Encoding.UTF8 };
+            var wc = new TimedWebClient { Encoding = Encoding.UTF8 };
             wc.Headers[HttpRequestHeader.UserAgent] = "WeatherWall/" + CurrentVersionText;
             return wc;
         }
@@ -138,17 +138,26 @@ namespace WeatherWall
             if (zip == null) return null;
 
             var staging = packFolder.TrimEnd('\\') + ".new";
-            if (Directory.Exists(staging)) Directory.Delete(staging, true);
-            Directory.CreateDirectory(staging);
-            var zipPath = Path.Combine(staging, "pack.zip");
-            File.WriteAllBytes(zipPath, zip);
-            ZipFile.ExtractToDirectory(zipPath, Path.Combine(staging, "images"));
+            // Only one pack on disk: the old images are deleted, and the staging copy never outlives
+            // this call, even when it fails.
+            try
+            {
+                if (Directory.Exists(staging)) Directory.Delete(staging, true);
+                Directory.CreateDirectory(staging);
+                var zipPath = Path.Combine(staging, "pack.zip");
+                File.WriteAllBytes(zipPath, zip);
+                ZipFile.ExtractToDirectory(zipPath, Path.Combine(staging, "images"));
 
-            Directory.CreateDirectory(packFolder);
-            foreach (var old in Directory.GetFiles(packFolder)) File.Delete(old);
-            foreach (var img in Directory.GetFiles(Path.Combine(staging, "images")))
-                File.Move(img, Path.Combine(packFolder, Path.GetFileName(img)));
-            Directory.Delete(staging, true);
+                Directory.CreateDirectory(packFolder);
+                foreach (var old in Directory.GetFiles(packFolder)) File.Delete(old);
+                foreach (var img in Directory.GetFiles(Path.Combine(staging, "images")))
+                    File.Move(img, Path.Combine(packFolder, Path.GetFileName(img)));
+            }
+            finally
+            {
+                try { if (Directory.Exists(staging)) Directory.Delete(staging, true); }
+                catch (Exception) { }
+            }
             return signature;
         }
 
@@ -176,8 +185,9 @@ namespace WeatherWall
         {
             try
             {
-                var old = Process.GetCurrentProcess().MainModule.FileName + ".old";
-                if (File.Exists(old)) File.Delete(old);
+                var exe = Process.GetCurrentProcess().MainModule.FileName;
+                foreach (var leftover in new[] { exe + ".old", exe + ".new" })
+                    if (File.Exists(leftover)) File.Delete(leftover);
             }
             catch (Exception) { }
         }
